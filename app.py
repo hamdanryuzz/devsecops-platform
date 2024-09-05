@@ -99,7 +99,7 @@ def sast_page_checkmarx():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Scan"):
-            st.write('Scan')
+            st.session_state.page = "sast_page_checkmarx_scan"
     with col2:
         if st.button('Result'):
             st.session_state.page = "sast_page_checkmarx_result"
@@ -136,11 +136,6 @@ def get_access_token():
         st.json(response.json())
     return None
 
-import streamlit as st
-import pandas as pd
-import requests
-import json
-import math  # Tambahkan ini
 
 def fetch_sast_results(access_token, scan_id, show_query, show_language,show_severity):
     url = "https://sng.ast.checkmarx.net/api/sast-results/"
@@ -311,6 +306,87 @@ def sast_page_checkmarx_result():
     if access_token and scan_id:
         fetch_sast_results(access_token, scan_id, show_query, show_language,show_severity)
 
+def sast_page_checkmarx_scan():
+    st.title("Scan Checkmarx SAST")
+
+    # Refresh Token Button
+    if st.button("Refresh Token"):
+        access_token = get_access_token()
+        if access_token:
+            st.session_state['access_token'] = access_token
+            st.success("Token refreshed successfully.")
+
+    # Form input untuk data project
+    with st.form(key='scan_form'):
+        project_id = st.text_input("Project ID")
+        repo_url = st.text_input("Repo URL")
+        username = st.text_input("Username")
+        api_key = st.text_input("API Key", type="password")  # Hide API Key input
+
+        submit_button = st.form_submit_button("Submit Scan Request")
+
+        if submit_button:
+            if 'access_token' not in st.session_state:
+                st.error("Access token is not available. Please refresh the token.")
+            else:
+                headers = {
+                    "Authorization": f"Bearer {st.session_state['access_token']}",
+                    "Accept": "application/json; version=1.0",
+                    "Content-Type": "application/json"
+                }
+
+                payload = {
+                    "project": {
+                        "id": project_id,
+                    },
+                    "type": "git",
+                    "handler": {
+                        "repoUrl": repo_url,
+                        "branch": "master",
+                        "credentials": {
+                            "username": username,
+                            "type": "apiKey",
+                            "value": api_key
+                        }
+                    },
+                    "tags": {
+                        "ScanTag01": "",
+                        "ScanSeverity": "high"
+                    },
+                    "config": [
+                        {
+                            "type": "sast",
+                            "value": {
+                                "incremental": "false",
+                                "presetName": "Checkmarx Default",
+                                "engineVerbose": "false"
+                            }
+                        },
+                    ]
+                }
+
+                # URL endpoint API
+                url = "https://sng.ast.checkmarx.net/api/scans/"
+
+                # Mengirim POST request
+                response = requests.post(url, data=json.dumps(payload), headers=headers)
+
+                # Menampilkan ID dari response jika status kode adalah 201
+                if response.status_code == 201:
+                    response_data = response.json()
+                    scan_id = response_data.get('id')
+                    if scan_id:
+                        st.success(f"Scan request submitted successfully. Scan ID: {scan_id}")
+                    else:
+                        st.error("Scan ID not found in the response.")
+                elif response.status_code == 200:
+                    response_data = response.json()
+                    st.success("Scan request processed successfully.")
+                    st.json(response_data)
+                else:
+                    st.error(f"Failed to submit scan request: {response.status_code}")
+                    st.json(response.json())
+
 def sast_page_checkmarx_result_group():
     if st.button("Back"):
         st.session_state.page = "sast_page_checkmarx"
@@ -346,3 +422,5 @@ elif st.session_state.page == 'sast_page_checkmarx_result':
     sast_page_checkmarx_result()
 elif st.session_state.page == 'sast_page_checkmarx_result_group':
     sast_page_checkmarx_result_group()
+elif st.session_state.page == 'sast_page_checkmarx_scan':
+    sast_page_checkmarx_scan()
