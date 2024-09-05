@@ -1,6 +1,3 @@
 pandas==2.2.2
 streamlit==1.37.1
 requests==2.32.3
-pyarmor==8.5.11
-pyarmor.cli.core==6.5.3
-pyarmor_runtime_000000
