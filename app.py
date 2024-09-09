@@ -47,7 +47,7 @@ def sca_page():
             st.write("You clicked Sonarqube.")
     with col2:
         if st.button("Checkmarx"):
-            st.write("You clicked Checkmarx.")
+            st.session_state.page = "sca_checkmarx_dashboard"
 
 def sast_page():
     if st.button("Back"):
@@ -104,6 +104,21 @@ def checkmarx_dashboard():
     with col2:
         if st.button("New Scan Project SAST"):
             st.session_state.page = "sast_page_checkmarx_scan"
+
+def sca_checkmarx_dashboard():
+    if st.button("Back"):
+        st.session_state.page = "sast_page"
+    st.markdown(button_style, unsafe_allow_html=True)  
+    st.title("SCA Checkmarx Dashboard")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("List Project SCA"):
+            st.session_state.page = "sca_page_checkmarx_list"
+    with col2:
+        if st.button("New Scan Project SCA"):
+            # st.session_state.page = "sast_page_checkmarx_scan"
+            st.write("SCA Scan")
 
 def sast_page_checkmarx():
     if st.button("Back"):
@@ -477,6 +492,30 @@ def get_scans_by_project_id(project_id):
     except ValueError:
         st.error("Gagal mengurai respons JSON.")
         return []
+
+def sca_get_scans_by_project_id(project_id):
+    access_token = get_access_token()
+    if not access_token:
+        return []
+
+    url = "https://sng.ast.checkmarx.net/api/scans/"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json; version=1.0",
+        "CorrelationId": ""
+    }
+    response = requests.get(url, headers=headers)
+
+    # Cek apakah respons JSON valid
+    try:
+        data = response.json()
+        scans = data.get('scans', [])
+        # Filter hanya untuk scan dengan 'type': 'sast' dan project_id yang sesuai
+        filtered_scans = [scan for scan in scans if scan['metadata']['configs'][0]['type'] == 'sca' and scan['projectId'] == project_id]
+        return filtered_scans
+    except ValueError:
+        st.error("Gagal mengurai respons JSON.")
+        return []
                          
 # Fungsi untuk mengambil detail scan berdasarkan scan-id
 def get_scan_results(scan_id):
@@ -517,250 +556,6 @@ def count_severity(scan_results):
     
     return severity_counts
 
-# def sast_page_checkmarx_list():
-#     if st.button("Back"):
-#         st.session_state.page = "checkmarx_dashboard"
-    
-#     st.title("List Project Checkmarx SAST")
-
-#     # Ambil daftar project
-#     projects = get_projects()
-
-#     if projects:
-#         st.subheader("Daftar Project:")
-#         for project in projects:
-#             if 'id' in project and 'name' in project:
-#                 with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
-#                     scans = get_scans_by_project_id(project['id'])
-
-#                     if scans:
-#                         scan_data = []
-#                         for scan in scans:
-#                             # Ambil hasil scan berdasarkan scan ID
-#                             scan_results = get_scan_results(scan['id'])
-#                             # Hitung severity
-#                             severity_counts = count_severity(scan_results)
-
-#                             # Format data scan ke bentuk dictionary
-#                             scan_data.append({
-#                                 "Scan ID": scan['id'], 
-#                                 "Type": scan['metadata']['configs'][0]['type'], 
-#                                 "Status": scan['status'],
-#                                 "Created At": scan['createdAt'],
-#                                 "High Severity": severity_counts['HIGH'],
-#                                 "Medium Severity": severity_counts['MEDIUM'],
-#                                 "Low Severity": severity_counts['LOW']
-#                             })
-                        
-#                         # Urutkan berdasarkan tanggal (Created At) secara descending
-#                         scan_data = sorted(scan_data, key=lambda x: x['Created At'], reverse=True)
-                        
-#                         # Convert data ke pandas DataFrame
-#                         if scan_data:  # Cek apakah data tidak kosong
-#                             df = pd.DataFrame(scan_data)
-#                             # Log untuk melihat hasil konversi
-#                             st.write(df)
-
-#                         else:
-#                             st.write("No data available to display.")
-#                     else:
-#                         st.write("No SAST scans found for this project.")
-
-
-# def sast_page_checkmarx_list():
-#     if st.button("Back"):
-#         st.session_state.page = "checkmarx_dashboard"
-    
-#     st.title("List Project Checkmarx SAST")
-
-#     # Ambil daftar project
-#     projects = get_projects()
-
-#     if projects:
-#         st.subheader("Daftar Project:")
-#         for project in projects:
-#             if 'id' in project and 'name' in project:
-#                 with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
-#                     scans = get_scans_by_project_id(project['id'])
-
-#                     if scans:
-#                         scan_data = []
-#                         for scan in scans:
-#                             # Ambil hasil scan berdasarkan scan ID
-#                             scan_results = get_scan_results(scan['id'])
-#                             # Hitung severity
-#                             severity_counts = count_severity(scan_results)
-
-#                             # Format data scan ke bentuk dictionary
-#                             scan_data.append({
-#                                 "Scan ID": scan['id'], 
-#                                 "Type": scan['metadata']['configs'][0]['type'], 
-#                                 "Status": scan['status'],
-#                                 "Created At": scan['createdAt'],
-#                                 "High Severity": severity_counts['HIGH'],
-#                                 "Medium Severity": severity_counts['MEDIUM'],
-#                                 "Low Severity": severity_counts['LOW']
-#                             })
-                        
-#                         # Urutkan berdasarkan tanggal (Created At) secara descending
-#                         scan_data = sorted(scan_data, key=lambda x: x['Created At'], reverse=True)
-                        
-#                         # Header Tabel
-#                         col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1, 1, 1, 1, 1])
-#                         with col1:
-#                             st.write("Scan ID")
-#                         with col2:
-#                             st.write("Type")
-#                         with col3:
-#                             st.write("Status")
-#                         with col4:
-#                             st.write("Created At")
-#                         with col5:
-#                             st.write("High Severity")
-#                         with col6:
-#                             st.write("Medium Severity")
-#                         with col7:
-#                             st.write("Action")
-
-#                         # Isi Tabel
-#                         for scan in scan_data:
-#                             scan_id = scan['Scan ID']
-#                             col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1, 1, 1, 1, 1])
-#                             with col1:
-#                                 st.write(scan['Scan ID'])
-#                             with col2:
-#                                 st.write(scan['Type'])
-#                             with col3:
-#                                 st.write(scan['Status'])
-#                             with col4:
-#                                 st.write(scan['Created At'])
-#                             with col5:
-#                                 st.write(scan['High Severity'])
-#                             with col6:
-#                                 st.write(scan['Medium Severity'])
-#                             with col7:
-#                                 if st.button(f"Show Result", key=f"result_{scan_id}"):
-#                                     # Simpan scan_id ke query params untuk melakukan redirect ke halaman result
-#                                     st.query_params = {"scan_id": scan_id}
-#                                     st.session_state.page = "sast_page_checkmarx_result"
-#                     else:
-#                         st.write("No SAST scans found for this project.")
-
-# def sast_page_checkmarx_result():
-#     if st.button("Back"):
-#         st.session_state.page = "sast_page_checkmarx"
-    
-#     st.title("Result Checkmarx SAST")
-
-#     if st.button("Refresh Token"):
-#         access_token = get_access_token()
-#         if access_token:
-#             st.session_state['access_token'] = access_token
-#             st.success("Token refreshed successfully.")
-
-#     access_token = st.session_state.get('access_token', '')
-    
-#     # Ambil scan_id dari session state
-#     scan_id = st.session_state.get('scan_id', '')
-
-#     st.text_input("Scan ID", value=scan_id)  # Tampilkan scan_id yang terpilih
-
-#     # Checkbox untuk menampilkan filter
-#     show_query = st.checkbox("Vulnerabilty")
-#     show_language = st.checkbox("Language")
-#     show_severity = st.checkbox("Severity")
-
-#     # Fetch data secara otomatis saat checkbox diubah
-#     if access_token and scan_id:
-#         fetch_sast_results(access_token, scan_id, show_query, show_language, show_severity)
-
-# def sast_page_checkmarx_list():
-#     if st.button("Back"):
-#         st.session_state.page = "checkmarx_dashboard"
-    
-#     st.title("List Project Checkmarx SAST")
-
-#     # Ambil access token dari API dan simpan di session state
-#     if 'access_token' not in st.session_state:
-#         access_token = get_access_token()
-#         st.session_state['access_token'] = access_token
-    
-#     # Ambil daftar project
-#     projects = get_projects()
-
-#     if projects:
-#         st.subheader("Daftar Project:")
-#         for project in projects:
-#             if 'id' in project and 'name' in project:
-#                 with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
-#                     scans = get_scans_by_project_id(project['id'])
-
-#                     if scans:
-#                         scan_data = []
-#                         for scan in scans:
-#                             # Ambil hasil scan berdasarkan scan ID
-#                             scan_results = get_scan_results(scan['id'])
-#                             # Hitung severity
-#                             severity_counts = count_severity(scan_results)
-
-#                             # Format data scan ke bentuk dictionary
-#                             scan_data.append({
-#                                 "Scan ID": scan['id'], 
-#                                 "Type": scan['metadata']['configs'][0]['type'], 
-#                                 "Status": scan['status'],
-#                                 "Created At": scan['createdAt'],
-#                                 "High Severity": severity_counts['HIGH'],
-#                                 "Medium Severity": severity_counts['MEDIUM'],
-#                                 "Low Severity": severity_counts['LOW']
-#                             })
-                        
-#                         # Urutkan berdasarkan tanggal (Created At) secara descending
-#                         scan_data = sorted(scan_data, key=lambda x: x['Created At'], reverse=True)
-                        
-#                         # Header Tabel
-#                         col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1, 1, 1, 1, 1, 1, 1,1])
-#                         with col1:
-#                             st.write("Scan ID")
-#                         with col2:
-#                             st.write("Type")
-#                         with col3:
-#                             st.write("Status")
-#                         with col4:
-#                             st.write("Created At")
-#                         with col5:
-#                             st.write("High Severity")
-#                         with col6:
-#                             st.write("Medium Severity")
-#                         with col7:
-#                             st.write("Low Severity")
-#                         with col8:
-#                             st.write("Action")
-
-#                         # Isi Tabel
-#                         for scan in scan_data:
-#                             scan_id = scan['Scan ID']
-#                             col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1, 1, 1, 1, 1, 1, 1,1])
-#                             with col1:
-#                                 st.write(scan['Scan ID'])
-#                             with col2:
-#                                 st.write(scan['Type'])
-#                             with col3:
-#                                 st.write(scan['Status'])
-#                             with col4:
-#                                 st.write(scan['Created At'])
-#                             with col5:
-#                                 st.write(scan['High Severity'])
-#                             with col6:
-#                                 st.write(scan['Medium Severity'])
-#                             with col7:
-#                                 st.write(scan['Low Severity'])
-#                             with col8:
-#                                 if st.button(f"Show Result", key=f"result_{scan_id}"):
-#                                     # Simpan scan_id dan access_token ke session_state, lalu redirect ke halaman result
-#                                     st.session_state.scan_id = scan_id
-#                                     st.session_state.page = "sast_page_checkmarx_result"
-#                     else:
-#                         st.write("No SAST scans found for this project.")
 
 def sast_page_checkmarx_list():
     if st.button("Back"):
@@ -863,105 +658,211 @@ def sast_page_checkmarx_list():
                     else:
                         st.write("No SAST scans found for this project.")
 
-# def sast_page_checkmarx_list():
+def sca_page_checkmarx_list():
+    if st.button("Back"):
+        st.session_state.page = "sca_checkmarx_dashboard"
+    
+    st.title("List Project Checkmarx SAST")
+
+    # Ambil daftar project
+    projects = get_projects()
+
+    if projects:
+        st.subheader("Daftar Project:")
+        for project in projects:
+            if 'id' in project and 'name' in project:
+                with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
+                    scans = sca_get_scans_by_project_id(project['id'])
+
+                    if scans:
+                        scan_data = []
+                        for scan in scans:
+                            # Ambil hasil scan berdasarkan scan ID
+                            scan_results = get_scan_results(scan['id'])
+                            # Hitung severity
+                            severity_counts = count_severity(scan_results)
+
+                            # Format data scan ke bentuk dictionary
+                            scan_data.append({
+                                "Scan ID": scan['id'], 
+                                "Type": scan['metadata']['configs'][0]['type'], 
+                                "Status": scan['status'],
+                                "Created At": scan['createdAt'],
+                                "High Severity": severity_counts['HIGH'],
+                                "Medium Severity": severity_counts['MEDIUM'],
+                                "Low Severity": severity_counts['LOW']
+                            })
+                        
+                        # Urutkan berdasarkan tanggal (Created At) secara descending
+                        scan_data = sorted(scan_data, key=lambda x: x['Created At'], reverse=True)
+                        
+                        # Header Tabel
+                        col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([2, 2, 2, 2, 2, 2, 2, 3,3])
+                        with col1:
+                            st.write("Scan ID")
+                        with col2:
+                            st.write("Type")
+                        with col3:
+                            st.write("Status")
+                        with col4:
+                            st.write("Created At")
+                        with col5:
+                            st.write("High Severity")
+                        with col6:
+                            st.write("Medium Severity")
+                        with col7:
+                            st.write("Low Severity")
+                        with col8:
+                            st.write("Action")
+                        with col9:
+                            st.write("Action")
+
+                        # Isi Tabel
+                        for scan in scan_data:
+                            scan_id = scan['Scan ID']
+                            project_id = project['id']
+                            col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([2, 2, 2, 2, 2, 2, 2, 3,3])
+                            with col1:
+                                st.write(scan['Scan ID'])
+                            with col2:
+                                st.write(scan['Type'])
+                            with col3:
+                                st.write(scan['Status'])
+                            with col4:
+                                st.write(scan['Created At'])
+                            with col5:
+                                st.write(scan['High Severity'])
+                            with col6:
+                                st.write(scan['Medium Severity'])
+                            with col7:
+                                st.write(scan['Low Severity'])
+                            with col8:
+                                if st.button(f"Result", key=f"result_{scan_id}"):
+                                    # Ambil access token baru saat tombol diklik
+                                    access_token = get_access_token()
+                                    if access_token:
+                                        # Simpan scan_id dan access_token ke session_state
+                                        st.session_state.scan_id = scan_id
+                                        st.session_state.access_token = access_token
+                                        # Arahkan ke halaman hasil
+                                        st.session_state.page = "sca_page_checkmarx_result"
+                                    # Tidak perlu st.experimental_rerun()
+                            with col9:
+                                if st.button(f"Report", key=f"report_{scan_id}"):
+                                    # Simpan scan_id, project_id, dan access_token ke session_state
+                                    st.session_state.scan_id = scan_id
+                                    st.session_state.project_id = project_id
+                                    st.session_state.access_token = st.session_state.get('access_token')
+                                    # Arahkan ke halaman report
+                                    st.session_state.page = "sast_page_checkmarx_report"
+
+                    else:
+                        st.write("No SCA scans found for this project.")
+
+# def sca_page_checkmarx_result():
 #     if st.button("Back"):
-#         st.session_state.page = "checkmarx_dashboard"
-    
-#     st.title("List Project Checkmarx SAST")
+#         st.session_state.page = "sca_checkmarx_dashboard"
+#     st.title("Result Checkmarx SCA")
 
-#     # Ambil access token dari API dan simpan di session state
-#     if 'access_token' not in st.session_state:
-#         access_token = get_access_token()
-#         st.session_state['access_token'] = access_token
-    
-#     # Ambil daftar project
-#     projects = get_projects()
+#     access_token = st.session_state.get('access_token', '')
+#     scan_id = st.session_state.get('scan_id', '')
 
-#     if projects:
-#         st.subheader("Daftar Project:")
-#         for project in projects:
-#             if 'id' in project and 'name' in project:
-#                 with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
-#                     scans = get_scans_by_project_id(project['id'])
+#     st.write(scan_id)
 
-#                     if scans:
-#                         scan_data = []
-#                         for scan in scans:
-#                             # Ambil hasil scan berdasarkan scan ID
-#                             scan_results = get_scan_results(scan['id'])
-#                             # Hitung severity
-#                             severity_counts = count_severity(scan_results)
+def sca_page_checkmarx_result():
+    if st.button("Back"):
+        st.session_state.page = "sca_checkmarx_dashboard"
+    st.title("Result Checkmarx SCA")
 
-#                             # Format data scan ke bentuk dictionary
-#                             scan_data.append({
-#                                 "Scan ID": scan['id'], 
-#                                 "Type": scan['metadata']['configs'][0]['type'], 
-#                                 "Status": scan['status'],
-#                                 "Created At": scan['createdAt'],
-#                                 "High Severity": severity_counts['HIGH'],
-#                                 "Medium Severity": severity_counts['MEDIUM'],
-#                                 "Low Severity": severity_counts['LOW']
-#                             })
-                        
-#                         # Urutkan berdasarkan tanggal (Created At) secara descending
-#                         scan_data = sorted(scan_data, key=lambda x: x['Created At'], reverse=True)
-                        
-#                         # Header Tabel
-#                         col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1])
-#                         with col1:
-#                             st.write("Scan ID")
-#                         with col2:
-#                             st.write("Type")
-#                         with col3:
-#                             st.write("Status")
-#                         with col4:
-#                             st.write("Created At")
-#                         with col5:
-#                             st.write("High Severity")
-#                         with col6:
-#                             st.write("Medium Severity")
-#                         with col7:
-#                             st.write("Low Severity")
-#                         with col8:
-#                             st.write("Result")
-#                         with col9:
-#                             st.write("Report")
+    access_token = st.session_state.get('access_token', '')
+    scan_id = st.session_state.get('scan_id', '')
 
-#                         # Isi Tabel
-#                         for scan in scan_data:
-#                             scan_id = scan['Scan ID']
-#                             project_id = project['id']
-#                             col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1])
-#                             with col1:
-#                                 st.write(scan['Scan ID'])
-#                             with col2:
-#                                 st.write(scan['Type'])
-#                             with col3:
-#                                 st.write(scan['Status'])
-#                             with col4:
-#                                 st.write(scan['Created At'])
-#                             with col5:
-#                                 st.write(scan['High Severity'])
-#                             with col6:
-#                                 st.write(scan['Medium Severity'])
-#                             with col7:
-#                                 st.write(scan['Low Severity'])
-#                             with col8:
-#                                 if st.button(f"Result", key=f"result_{scan_id}"):
-#                                     # Simpan scan_id dan access_token ke session_state
-#                                     st.session_state.scan_id = scan_id
-#                                     st.session_state.access_token = st.session_state.get('access_token')
-#                                     # Arahkan ke halaman hasil
-#                                     st.session_state.page = "sast_page_checkmarx_result"
-#                             with col9:
-#                                 if st.button(f"Report", key=f"report_{scan_id}"):
-#                                     # Simpan scan_id, project_id, dan access_token ke session_state
-#                                     st.session_state.scan_id = scan_id
-#                                     st.session_state.project_id = project_id
-#                                     st.session_state.access_token = st.session_state.get('access_token')
-#                                     # Arahkan ke halaman report
-#                                     st.session_state.page = "sast_page_checkmarx_report"
+    st.write(f"Scan ID: {scan_id}")
 
+    # URL untuk membuat laporan
+    create_report_url = "https://sng.ast.checkmarx.net/api/sca/export/requests"
+
+    # Headers
+    headers = {
+        "Authorization": f"Bearer {access_token}",  # Ganti dengan token akses Anda
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    # Body parameters
+    data = {
+        "ScanId": scan_id,  # Menggunakan Scan ID dari session state
+        "FileFormat": "ScanReportJson",  # Format laporan yang diinginkan
+        "ExportParameters": {
+            "hideDevAndTestDependencies": False,
+            "showOnlyEffectiveLicenses": False,
+            "excludePackages": False,
+            "excludeLicenses": True,
+            "excludeVulnerabilities": False,
+            "excludePolicies": True
+        }
+    }
+
+    # Mengirimkan request POST untuk membuat laporan
+    response = requests.post(create_report_url, headers=headers, json=data)
+
+    # Memeriksa status response untuk mendapatkan export_id
+    if response.status_code == 202:
+        export_id = response.json().get("exportId")
+        st.write(f"Laporan berhasil dibuat. Export ID: {export_id}")
+        
+        # Memeriksa status export sampai "Completed"
+        check_status_url = f"https://sng.ast.checkmarx.net/api/sca/export/requests?exportId={export_id}"
+
+        # Menggunakan spinner sebagai animasi loading
+        with st.spinner('Menunggu hingga laporan selesai...'):
+            while True:
+                status_response = requests.get(check_status_url, headers=headers)
+                status_data = status_response.json()
+                export_status = status_data.get('exportStatus')
+                
+                if export_status == "Completed":
+                    st.success("Export Completed!")
+                    file_url = status_data.get('fileUrl')
+                    break
+                elif export_status == "Failed":
+                    st.error("Export gagal.")
+                    return
+                else:
+                    time.sleep(5)  # Tunggu 5 detik sebelum pengecekan ulang
+
+        # Mengunduh hasil laporan setelah status Completed
+        download_url = file_url
+        download_response = requests.get(download_url, headers=headers)
+
+        if download_response.status_code == 200:
+            report_data = download_response.json()  # Parsing JSON dari response
+
+            # Membuat tabel untuk menampilkan hasil
+            if "Packages" in report_data:
+                packages = report_data["Packages"]
+                results = [{
+                    "Id": pkg["Id"],
+                    "Name": pkg["Name"],
+                    "Version": pkg["Version"],
+                    "Licenses": ', '.join(pkg.get("Licenses", [])),
+                    "MatchType": pkg.get("MatchType", ""),
+                    "CriticalVulnerabilityCount": pkg.get("CriticalVulnerabilityCount", 0),
+                    "HighVulnerabilityCount": pkg.get("HighVulnerabilityCount", 0),
+                    "MediumVulnerabilityCount": pkg.get("MediumVulnerabilityCount", 0),
+                    "LowVulnerabilityCount": pkg.get("LowVulnerabilityCount", 0)
+                } for pkg in packages]
+
+                # Menampilkan data dalam tabel menggunakan Streamlit
+                st.table(results)
+            else:
+                st.write("Tidak ada data Packages yang ditemukan dalam laporan.")
+        else:
+            st.write(f"Terjadi kesalahan saat mengunduh laporan: {download_response.status_code} - {download_response.text}")
+
+    else:
+        st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
+        st.write("Response:", response.text)
 def sast_page_checkmarx_report():
     if st.button("Back"):
         st.session_state.page = "sast_page_checkmarx_list"
@@ -1090,3 +991,9 @@ elif st.session_state.page == 'sast_page_checkmarx_list':
     sast_page_checkmarx_list()
 elif st.session_state.page == 'sast_page_checkmarx_report':
     sast_page_checkmarx_report()
+elif st.session_state.page == 'sca_checkmarx_dashboard':
+    sca_checkmarx_dashboard()
+elif st.session_state.page == 'sca_page_checkmarx_list':
+    sca_page_checkmarx_list()
+elif st.session_state.page == 'sca_page_checkmarx_result':
+    sca_page_checkmarx_result()
