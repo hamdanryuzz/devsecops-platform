@@ -107,7 +107,7 @@ def checkmarx_dashboard():
 
 def sca_checkmarx_dashboard():
     if st.button("Back"):
-        st.session_state.page = "sast_page"
+        st.session_state.page = "sca_page"
     st.markdown(button_style, unsafe_allow_html=True)  
     st.title("SCA Checkmarx Dashboard")
 
@@ -165,7 +165,6 @@ def get_access_token():
         st.error(f"Terjadi kesalahan. Status code: {response.status_code}")
         st.json(response.json())
     return None
-
 
 def fetch_sast_results(access_token, scan_id, show_query, show_language,show_severity):
     url = "https://sng.ast.checkmarx.net/api/sast-results/"
@@ -284,11 +283,6 @@ def fetch_sast_results(access_token, scan_id, show_query, show_language,show_sev
                             with st.expander(f"{query_name} > {language} > {severity}"):
                                 st.write(severity_group)
 
-
-
-
-
-
             else:
                 # Dropdown untuk memilih jumlah item per halaman
                 items_per_page = st.selectbox('Items per page', [5, 10, 20, 50, 100], index=1)
@@ -311,30 +305,6 @@ def fetch_sast_results(access_token, scan_id, show_query, show_language,show_sev
             st.error(f"Error fetching data: {response.status_code}")
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
-
-# def sast_page_checkmarx_result():
-#     if st.button("Back"):
-#         st.session_state.page = "sast_page_checkmarx"
-#     st.title("Result Checkmarx SAST")
-
-#     if st.button("Refresh Token"):
-#         access_token = get_access_token()
-#         if access_token:
-#             st.session_state['access_token'] = access_token
-#             st.success("Token refreshed successfully.")
-
-#     access_token = st.session_state.get('access_token', '')
-
-#     scan_id = st.text_input("Scan ID", "ee86f413-e659-4d59-8b09-67891142a9a5")
-
-#     # Checkbox untuk menampilkan filter
-#     show_query = st.checkbox("Vulnerabilty")
-#     show_language = st.checkbox("Language")
-#     show_severity = st.checkbox("Severity")
-
-#     # Fetch data secara otomatis saat checkbox diubah
-#     if access_token and scan_id:
-#         fetch_sast_results(access_token, scan_id, show_query, show_language,show_severity)
 
 def check_scan_status(scan_id, access_token):
     # URL untuk mendapatkan status scan
@@ -468,7 +438,6 @@ def get_projects():
         st.error("Gagal mengurai respons JSON.")
         return []
 
-# Fungsi untuk mengambil list scan berdasarkan project id
 def get_scans_by_project_id(project_id):
     access_token = get_access_token()
     if not access_token:
@@ -517,7 +486,6 @@ def sca_get_scans_by_project_id(project_id):
         st.error("Gagal mengurai respons JSON.")
         return []
                          
-# Fungsi untuk mengambil detail scan berdasarkan scan-id
 def get_scan_results(scan_id):
     access_token = get_access_token()
     if not access_token:
@@ -540,8 +508,7 @@ def get_scan_results(scan_id):
     else:
         st.error(f"Failed to fetch scan results. Status code: {response.status_code}")
         return []  # Jika gagal, kembalikan list kosong
-
-# Fungsi untuk menghitung jumlah severity (high, medium, low)
+    
 def count_severity(scan_results):
     severity_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
     
@@ -553,6 +520,58 @@ def count_severity(scan_results):
         severity = result.get("severity", "").upper()
         if severity in severity_counts:
             severity_counts[severity] += 1
+    
+    return severity_counts
+
+def get_sca_scan_result(scan_id):
+    access_token = get_access_token()
+    if not access_token:
+        return []  # Pastikan selalu mengembalikan list kosong jika tidak ada token
+
+    # URL untuk API scan summary
+    url = "https://sng.ast.checkmarx.net/api/scan-summary"
+    
+    # Parameter query untuk API
+    querystring = {
+        "scan-ids": scan_id,
+        "include-queries": "false",
+        "include-status-counters": "false",
+        "include-files": "false"
+    }
+    
+    # Headers, termasuk JWT access token
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json; version=1.0",
+        "CorrelationId": ""
+    }
+    
+    # Mengirim permintaan GET ke API
+    response = requests.get(url, headers=headers, params=querystring)
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("scansSummaries",[]) # Kembalikan list dari severityCounters
+    else:
+        # Jika gagal, tampilkan pesan error dan kembalikan list kosong
+        print(f"Failed to fetch SCA scan results. Status code: {response.status_code}")
+        return []
+
+def sca_count_severity(scan_results):
+    severity_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+    
+    # Tambahkan pemeriksaan jika scan_results adalah list kosong
+    if not scan_results:
+        return severity_counts
+    
+    for result in scan_results:
+        sca_counters = result.get('scaCounters', {})
+        severity_counters = sca_counters.get('severityCounters', [])
+        
+        for severity_data in severity_counters:
+            severity = severity_data.get("severity", "").upper()
+            if severity in severity_counts:
+                severity_counts[severity] += severity_data.get("counter", 0)
     
     return severity_counts
 
@@ -578,8 +597,10 @@ def sast_page_checkmarx_list():
                         for scan in scans:
                             # Ambil hasil scan berdasarkan scan ID
                             scan_results = get_scan_results(scan['id'])
+                            # st.write(scan_results)
                             # Hitung severity
                             severity_counts = count_severity(scan_results)
+                            # st.write(severity_counts)
 
                             # Format data scan ke bentuk dictionary
                             scan_data.append({
@@ -648,11 +669,11 @@ def sast_page_checkmarx_list():
                                     # Tidak perlu st.experimental_rerun()
                             with col9:
                                 if st.button(f"Report", key=f"report_{scan_id}"):
+                                    access_token = get_access_token()
                                     # Simpan scan_id, project_id, dan access_token ke session_state
                                     st.session_state.scan_id = scan_id
                                     st.session_state.project_id = project_id
-                                    st.session_state.access_token = st.session_state.get('access_token')
-                                    # Arahkan ke halaman report
+                                    st.session_state.access_token = access_token                                    # Arahkan ke halaman report
                                     st.session_state.page = "sast_page_checkmarx_report"
 
                     else:
@@ -662,7 +683,7 @@ def sca_page_checkmarx_list():
     if st.button("Back"):
         st.session_state.page = "sca_checkmarx_dashboard"
     
-    st.title("List Project Checkmarx SAST")
+    st.title("List Project Checkmarx SCA")
 
     # Ambil daftar project
     projects = get_projects()
@@ -673,15 +694,16 @@ def sca_page_checkmarx_list():
             if 'id' in project and 'name' in project:
                 with st.expander(f"Project: {project['name']} (ID: {project['id']})"):
                     scans = sca_get_scans_by_project_id(project['id'])
-
+                    # st.write(scans)
                     if scans:
                         scan_data = []
                         for scan in scans:
                             # Ambil hasil scan berdasarkan scan ID
-                            scan_results = get_scan_results(scan['id'])
+                            scan_results = get_sca_scan_result(scan['id'])
+                            # st.write(scan_results)
                             # Hitung severity
-                            severity_counts = count_severity(scan_results)
-
+                            severity_counts = sca_count_severity(scan_results)
+                            # st.write(severity_counts)
                             # Format data scan ke bentuk dictionary
                             scan_data.append({
                                 "Scan ID": scan['id'], 
@@ -741,33 +763,170 @@ def sca_page_checkmarx_list():
                                     # Ambil access token baru saat tombol diklik
                                     access_token = get_access_token()
                                     if access_token:
-                                        # Simpan scan_id dan access_token ke session_state
+                                        access_token = get_access_token()
+                                        # Simpan scan_id, project_id, dan access_token ke session_state
                                         st.session_state.scan_id = scan_id
-                                        st.session_state.access_token = access_token
+                                        st.session_state.project_id = project_id
+                                        st.session_state.access_token = access_token 
                                         # Arahkan ke halaman hasil
                                         st.session_state.page = "sca_page_checkmarx_result"
                                     # Tidak perlu st.experimental_rerun()
                             with col9:
                                 if st.button(f"Report", key=f"report_{scan_id}"):
+                                    access_token = get_access_token()
                                     # Simpan scan_id, project_id, dan access_token ke session_state
                                     st.session_state.scan_id = scan_id
                                     st.session_state.project_id = project_id
-                                    st.session_state.access_token = st.session_state.get('access_token')
+                                    st.session_state.access_token = access_token 
                                     # Arahkan ke halaman report
-                                    st.session_state.page = "sast_page_checkmarx_report"
+                                    st.session_state.page = "sca_page_checkmarx_report"
 
                     else:
                         st.write("No SCA scans found for this project.")
 
-# def sca_page_checkmarx_result():
-#     if st.button("Back"):
-#         st.session_state.page = "sca_checkmarx_dashboard"
-#     st.title("Result Checkmarx SCA")
+def sast_page_checkmarx_report():
+    if st.button("Back"):
+        st.session_state.page = "checkmarx_dashboard"
 
-#     access_token = st.session_state.get('access_token', '')
-#     scan_id = st.session_state.get('scan_id', '')
+    st.title("Generate Report Checkmarx SAST")
 
-#     st.write(scan_id)
+    # Ambil access token, scan_id, dan project_id dari session state
+    access_token = st.session_state.get('access_token', '')
+    scan_id = st.session_state.get('scan_id', '')
+    project_id = st.session_state.get('project_id', '')
+    st.write(access_token)
+
+
+    # Tampilkan Scan ID dan Project ID yang terpilih
+    if scan_id and project_id:
+        st.write(f"Generating report for Scan ID: {scan_id} and Project ID: {project_id}")
+
+        email = st.text_input("Email recipient", value="recipient@example.com")
+        file_format = st.selectbox("File format", options=["pdf", "json", "csv"])
+        
+        if st.button("Generate Report"):
+            # Panggil API untuk membuat report
+            sca_create_report(scan_id, project_id, email, file_format, access_token)
+    else:
+        st.write("Missing scan ID or project ID.")
+
+def sca_page_checkmarx_report():
+    if st.button("Back"):
+        st.session_state.page = "sca_checkmarx_dashboard"
+
+    st.title("Generate Report Checkmarx SCA")
+
+    # Ambil access token, scan_id, dan project_id dari session state
+    access_token = st.session_state.get('access_token', '')
+    scan_id = st.session_state.get('scan_id', '')
+    project_id = st.session_state.get('project_id', '')
+
+
+    # Tampilkan Scan ID dan Project ID yang terpilih
+    if scan_id and project_id:
+        st.write(f"Generating report for Scan ID: {scan_id} and Project ID: {project_id}")
+
+        email = st.text_input("Email recipient", value="recipient@example.com")
+        file_format = st.selectbox("File format", options=["pdf", "json", "csv"])
+        
+        if st.button("Generate Report"):
+            # Panggil API untuk membuat report
+            sca_create_report(scan_id, project_id, email, file_format, access_token)
+    else:
+        st.write("Missing scan ID or project ID.")
+
+def create_report(scan_id, project_id, email, file_format, access_token):
+    url = "https://sng.ast.checkmarx.net/api/reports"
+    
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "*/*; version=1.0",
+    }
+
+    data = {
+        "reportName": "improved-scan-report",
+        "fileFormat": file_format,  # Bisa "pdf", "json", atau "csv"
+        "reportType": "email",  # Bisa "cli", "ui", atau "email"
+        "data": {
+            "scanId": scan_id,  # Scan ID yang sesuai
+            "projectId": project_id,  # Project ID yang sesuai
+            "branchName": "main",  # Nama branch jika diperlukan
+            "sections": ["scan-information", "results-overview", "scan-results"],  # Bagian yang ingin disertakan
+            "scanners": ["SAST"],  # Scanner yang ingin disertakan
+            "email": [email]  # Email penerima laporan
+        }
+    }
+
+    # Melakukan POST request ke API
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 202:
+        # Ambil reportId dari respon
+        report_id = response.json().get("reportId")
+        st.success(f"Report successfully generated! Report ID: {report_id}")
+    else:
+        st.error(f"Failed to generate report. Status code: {response.status_code}")
+        st.write("Response:", response.text)
+
+def sca_create_report(scan_id, project_id, email, file_format, access_token):
+    url = "https://sng.ast.checkmarx.net/api/reports"
+    
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "*/*; version=1.0",
+    }
+
+    data = {
+        "reportName": "improved-scan-report",
+        "fileFormat": file_format,  # Bisa "pdf", "json", atau "csv"
+        "reportType": "email",  # Bisa "cli", "ui", atau "email"
+        "data": {
+            "scanId": scan_id,  # Scan ID yang sesuai
+            "projectId": project_id,  # Project ID yang sesuai
+            "branchName": "main",  # Nama branch jika diperlukan
+            "sections": ["scan-information", "results-overview", "scan-results"],  # Bagian yang ingin disertakan
+            "scanners": ["SCA"],  # Scanner yang ingin disertakan
+            "email": [email]  # Email penerima laporan
+        }
+    }
+
+    # Melakukan POST request ke API
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 202:
+        # Ambil reportId dari respon
+        report_id = response.json().get("reportId")
+        st.success(f"Report successfully generated! Report ID: {report_id}")
+    else:
+        st.error(f"Failed to generate report. Status code: {response.status_code}")
+        st.write("Response:", response.text)
+
+def sast_page_checkmarx_result():
+    if st.button("Back"):
+        st.session_state.page = "checkmarx_dashboard"
+    
+    st.title("Result Checkmarx SAST")
+
+    # Ambil access token dan scan_id dari session state
+    access_token = st.session_state.get('access_token', '')
+    scan_id = st.session_state.get('scan_id', '')
+
+    # Tampilkan Scan ID yang terpilih
+    if scan_id:
+        st.write(f"Showing results for Scan ID: {scan_id}")
+        
+        # Checkbox untuk menampilkan filter
+        show_query = st.checkbox("Vulnerability")
+        show_language = st.checkbox("Language")
+        show_severity = st.checkbox("Severity")
+
+        # Fetch data secara otomatis tanpa harus refresh token
+        if access_token and scan_id:
+            fetch_sast_results(access_token, scan_id, show_query, show_language, show_severity)
+        else:
+            st.error("Missing access token or scan ID.")
+    else:
+        st.write("No scan ID selected.")
 
 def sca_page_checkmarx_result():
     if st.button("Back"):
@@ -863,89 +1022,6 @@ def sca_page_checkmarx_result():
     else:
         st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
         st.write("Response:", response.text)
-def sast_page_checkmarx_report():
-    if st.button("Back"):
-        st.session_state.page = "sast_page_checkmarx_list"
-
-    st.title("Generate Report Checkmarx SAST")
-
-    # Ambil access token, scan_id, dan project_id dari session state
-    access_token = st.session_state.get('access_token', '')
-    scan_id = st.session_state.get('scan_id', '')
-    project_id = st.session_state.get('project_id', '')
-
-    # Tampilkan Scan ID dan Project ID yang terpilih
-    if scan_id and project_id:
-        st.write(f"Generating report for Scan ID: {scan_id} and Project ID: {project_id}")
-
-        email = st.text_input("Email recipient", value="recipient@example.com")
-        file_format = st.selectbox("File format", options=["pdf", "json", "csv"])
-        
-        if st.button("Generate Report"):
-            # Panggil API untuk membuat report
-            create_report(scan_id, project_id, email, file_format, access_token)
-    else:
-        st.write("Missing scan ID or project ID.")
-
-def create_report(scan_id, project_id, email, file_format, access_token):
-    url = "https://sng.ast.checkmarx.net/api/reports"
-    
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "*/*; version=1.0",
-    }
-
-    data = {
-        "reportName": "improved-scan-report",
-        "fileFormat": file_format,  # Bisa "pdf", "json", atau "csv"
-        "reportType": "email",  # Bisa "cli", "ui", atau "email"
-        "data": {
-            "scanId": scan_id,  # Scan ID yang sesuai
-            "projectId": project_id,  # Project ID yang sesuai
-            "branchName": "main",  # Nama branch jika diperlukan
-            "sections": ["scan-information", "results-overview", "scan-results"],  # Bagian yang ingin disertakan
-            "scanners": ["SAST"],  # Scanner yang ingin disertakan
-            "email": [email]  # Email penerima laporan
-        }
-    }
-
-    # Melakukan POST request ke API
-    response = requests.post(url, headers=headers, json=data)
-
-    if response.status_code == 202:
-        # Ambil reportId dari respon
-        report_id = response.json().get("reportId")
-        st.success(f"Report successfully generated! Report ID: {report_id}")
-    else:
-        st.error(f"Failed to generate report. Status code: {response.status_code}")
-        st.write("Response:", response.text)
-
-def sast_page_checkmarx_result():
-    if st.button("Back"):
-        st.session_state.page = "sast_page_checkmarx_list"
-    
-    st.title("Result Checkmarx SAST")
-
-    # Ambil access token dan scan_id dari session state
-    access_token = st.session_state.get('access_token', '')
-    scan_id = st.session_state.get('scan_id', '')
-
-    # Tampilkan Scan ID yang terpilih
-    if scan_id:
-        st.write(f"Showing results for Scan ID: {scan_id}")
-        
-        # Checkbox untuk menampilkan filter
-        show_query = st.checkbox("Vulnerability")
-        show_language = st.checkbox("Language")
-        show_severity = st.checkbox("Severity")
-
-        # Fetch data secara otomatis tanpa harus refresh token
-        if access_token and scan_id:
-            fetch_sast_results(access_token, scan_id, show_query, show_language, show_severity)
-        else:
-            st.error("Missing access token or scan ID.")
-    else:
-        st.write("No scan ID selected.")
 
 
 def sast_page_checkmarx_result_group():
@@ -967,33 +1043,25 @@ def sast_page_checkmarx_result_group():
 if 'page' not in st.session_state:
     st.session_state.page = 'main_page'
 
-if st.session_state.page == 'main_page':
-    main_page()
-elif st.session_state.page == 'sca_page':
-    sca_page()
-elif st.session_state.page == 'sast_page':
-    sast_page()
-elif st.session_state.page == 'dast_page':
-    dast_page()
-elif st.session_state.page == 'raps_page':
-    raps_page()
-elif st.session_state.page == 'sast_page_checkmarx':
-    sast_page_checkmarx()
-elif st.session_state.page == 'sast_page_checkmarx_result':
-    sast_page_checkmarx_result()
-elif st.session_state.page == 'sast_page_checkmarx_result_group':
-    sast_page_checkmarx_result_group()
-elif st.session_state.page == 'sast_page_checkmarx_scan':
-    sast_page_checkmarx_scan()
-elif st.session_state.page =="checkmarx_dashboard":
-    checkmarx_dashboard()
-elif st.session_state.page == 'sast_page_checkmarx_list':
-    sast_page_checkmarx_list()
-elif st.session_state.page == 'sast_page_checkmarx_report':
-    sast_page_checkmarx_report()
-elif st.session_state.page == 'sca_checkmarx_dashboard':
-    sca_checkmarx_dashboard()
-elif st.session_state.page == 'sca_page_checkmarx_list':
-    sca_page_checkmarx_list()
-elif st.session_state.page == 'sca_page_checkmarx_result':
-    sca_page_checkmarx_result()
+page_functions = {
+    'main_page': main_page,
+    'sca_page': sca_page,
+    'sast_page': sast_page,
+    'dast_page': dast_page,
+    'raps_page': raps_page,
+    'sast_page_checkmarx': sast_page_checkmarx,
+    'sast_page_checkmarx_result': sast_page_checkmarx_result,
+    'sast_page_checkmarx_result_group': sast_page_checkmarx_result_group,
+    'sast_page_checkmarx_scan': sast_page_checkmarx_scan,
+    'checkmarx_dashboard': checkmarx_dashboard,
+    'sast_page_checkmarx_list': sast_page_checkmarx_list,
+    'sast_page_checkmarx_report': sast_page_checkmarx_report,
+    'sca_checkmarx_dashboard': sca_checkmarx_dashboard,
+    'sca_page_checkmarx_list': sca_page_checkmarx_list,
+    'sca_page_checkmarx_result': sca_page_checkmarx_result,
+    'sca_page_checkmarx_report': sca_page_checkmarx_report
+}
+
+# Panggil fungsi yang sesuai berdasarkan halaman di session_state
+page_function = page_functions.get(st.session_state.page, main_page)
+page_function()
