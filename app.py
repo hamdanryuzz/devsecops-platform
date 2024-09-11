@@ -763,14 +763,17 @@ def sca_page_checkmarx_list():
                                     # Ambil access token baru saat tombol diklik
                                     access_token = get_access_token()
                                     if access_token:
-                                        access_token = get_access_token()
                                         # Simpan scan_id, project_id, dan access_token ke session_state
                                         st.session_state.scan_id = scan_id
                                         st.session_state.project_id = project_id
-                                        st.session_state.access_token = access_token 
+                                        st.session_state.access_token = access_token
+                                        
+                                        # Reset atau hapus report_data dari session_state agar data lama tidak digunakan
+                                        if 'report_data' in st.session_state:
+                                            del st.session_state['report_data']  # Hapus report_data untuk load ulang data baru
+
                                         # Arahkan ke halaman hasil
                                         st.session_state.page = "sca_page_checkmarx_result"
-                                    # Tidak perlu st.experimental_rerun()
                             with col9:
                                 if st.button(f"Report", key=f"report_{scan_id}"):
                                     access_token = get_access_token()
@@ -928,101 +931,343 @@ def sast_page_checkmarx_result():
     else:
         st.write("No scan ID selected.")
 
+# def sca_page_checkmarx_result():
+#     if st.button("Back"):
+#         st.session_state.page = "sca_checkmarx_dashboard"
+#     st.title("Result Checkmarx SCA")
+
+#     access_token = st.session_state.get('access_token', '')
+#     scan_id = st.session_state.get('scan_id', '')
+
+#     st.write(f"Scan ID: {scan_id}")
+
+#     # URL untuk membuat laporan
+#     create_report_url = "https://sng.ast.checkmarx.net/api/sca/export/requests"
+
+#     # Headers
+#     headers = {
+#         "Authorization": f"Bearer {access_token}",  # Ganti dengan token akses Anda
+#         "Content-Type": "application/json",
+#         "Accept": "application/json"
+#     }
+
+#     # Body parameters
+#     data = {
+#         "ScanId": scan_id,  # Menggunakan Scan ID dari session state
+#         "FileFormat": "ScanReportJson",  # Format laporan yang diinginkan
+#         "ExportParameters": {
+#             "hideDevAndTestDependencies": False,
+#             "showOnlyEffectiveLicenses": False,
+#             "excludePackages": False,
+#             "excludeLicenses": True,
+#             "excludeVulnerabilities": False,
+#             "excludePolicies": True
+#         }
+#     }
+
+#     # Mengirimkan request POST untuk membuat laporan
+#     response = requests.post(create_report_url, headers=headers, json=data)
+
+#     # Memeriksa status response untuk mendapatkan export_id
+#     if response.status_code == 202:
+#         export_id = response.json().get("exportId")
+#         st.write(f"Laporan berhasil dibuat. Export ID: {export_id}")
+        
+#         # Memeriksa status export sampai "Completed"
+#         check_status_url = f"https://sng.ast.checkmarx.net/api/sca/export/requests?exportId={export_id}"
+
+#         # Menggunakan spinner sebagai animasi loading
+#         with st.spinner('Menunggu hingga laporan selesai...'):
+#             while True:
+#                 status_response = requests.get(check_status_url, headers=headers)
+#                 status_data = status_response.json()
+#                 export_status = status_data.get('exportStatus')
+                
+#                 if export_status == "Completed":
+#                     st.success("Export Completed!")
+#                     file_url = status_data.get('fileUrl')
+#                     break
+#                 elif export_status == "Failed":
+#                     st.error("Export gagal.")
+#                     return
+#                 else:
+#                     time.sleep(5)  # Tunggu 5 detik sebelum pengecekan ulang
+
+#         # Mengunduh hasil laporan setelah status Completed
+#         download_url = file_url
+#         download_response = requests.get(download_url, headers=headers)
+
+#         if download_response.status_code == 200:
+#             report_data = download_response.json()  # Parsing JSON dari response
+
+#             # Membuat tabel untuk menampilkan hasil
+#             if "Packages" in report_data:
+#                 packages = report_data["Packages"]
+#                 results = [{
+#                     "Id": pkg["Id"],
+#                     "Name": pkg["Name"],
+#                     "Version": pkg["Version"],
+#                     "Licenses": ', '.join(pkg.get("Licenses", [])),
+#                     "MatchType": pkg.get("MatchType", ""),
+#                     "CriticalVulnerabilityCount": pkg.get("CriticalVulnerabilityCount", 0),
+#                     "HighVulnerabilityCount": pkg.get("HighVulnerabilityCount", 0),
+#                     "MediumVulnerabilityCount": pkg.get("MediumVulnerabilityCount", 0),
+#                     "LowVulnerabilityCount": pkg.get("LowVulnerabilityCount", 0)
+#                 } for pkg in packages]
+
+#                 # Menampilkan data dalam tabel menggunakan Streamlit
+#                 st.table(results)
+#             else:
+#                 st.write("Tidak ada data Packages yang ditemukan dalam laporan.")
+#         else:
+#             st.write(f"Terjadi kesalahan saat mengunduh laporan: {download_response.status_code} - {download_response.text}")
+
+#     else:
+#         st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
+#         st.write("Response:", response.text)
+
+
+# def sca_page_checkmarx_result():
+#     if st.button("Back"):
+#         st.session_state.page = "sca_checkmarx_dashboard"
+#     st.title("Result Checkmarx SCA")
+
+#     access_token = st.session_state.get('access_token', '')
+#     scan_id = st.session_state.get('scan_id', '')
+
+#     st.write(f"Scan ID: {scan_id}")
+
+#     # Periksa apakah data sudah ada di session_state
+#     if 'report_data' not in st.session_state:
+#         # Jika tidak ada, lakukan request API dan simpan hasilnya ke session_state
+#         create_report_url = "https://sng.ast.checkmarx.net/api/sca/export/requests"
+
+#         # Headers
+#         headers = {
+#             "Authorization": f"Bearer {access_token}",
+#             "Content-Type": "application/json",
+#             "Accept": "application/json"
+#         }
+
+#         # Body parameters
+#         data = {
+#             "ScanId": scan_id,
+#             "FileFormat": "ScanReportJson",
+#             "ExportParameters": {
+#                 "hideDevAndTestDependencies": False,
+#                 "showOnlyEffectiveLicenses": False,
+#                 "excludePackages": False,
+#                 "excludeLicenses": True,
+#                 "excludeVulnerabilities": False,
+#                 "excludePolicies": True
+#             }
+#         }
+
+#         # Mengirimkan request POST untuk membuat laporan
+#         response = requests.post(create_report_url, headers=headers, json=data)
+
+#         if response.status_code == 202:
+#             export_id = response.json().get("exportId")
+#             st.write(f"Laporan berhasil dibuat. Export ID: {export_id}")
+
+#             check_status_url = f"https://sng.ast.checkmarx.net/api/sca/export/requests?exportId={export_id}"
+
+#             with st.spinner('Menunggu hingga laporan selesai...'):
+#                 while True:
+#                     status_response = requests.get(check_status_url, headers=headers)
+#                     status_data = status_response.json()
+#                     export_status = status_data.get('exportStatus')
+
+#                     if export_status == "Completed":
+#                         st.success("Export Completed!")
+#                         file_url = status_data.get('fileUrl')
+#                         break
+#                     elif export_status == "Failed":
+#                         st.error("Export gagal.")
+#                         return
+#                     else:
+#                         time.sleep(5)
+
+#             # Mengunduh hasil laporan setelah status Completed
+#             download_url = file_url
+#             download_response = requests.get(download_url, headers=headers)
+
+#             if download_response.status_code == 200:
+#                 report_data = download_response.json()
+#                 st.session_state.report_data = report_data  # Simpan data ke session_state
+#             else:
+#                 st.write(f"Terjadi kesalahan saat mengunduh laporan: {download_response.status_code} - {download_response.text}")
+#                 return
+#         else:
+#             st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
+#             st.write("Response:", response.text)
+#             return
+#     else:
+#         # Jika data sudah ada, ambil dari session_state
+#         report_data = st.session_state.report_data
+
+#     # Setelah data ada di session_state, lakukan proses paginasi
+#     if "Packages" in report_data:
+#         packages = report_data["Packages"]
+#         results = [{
+#             "Id": pkg["Id"],
+#             "Name": pkg["Name"],
+#             "Version": pkg["Version"],
+#             "Licenses": ', '.join(pkg.get("Licenses", [])),
+#             "MatchType": pkg.get("MatchType", ""),
+#             "CriticalVulnerabilityCount": pkg.get("CriticalVulnerabilityCount", 0),
+#             "HighVulnerabilityCount": pkg.get("HighVulnerabilityCount", 0),
+#             "MediumVulnerabilityCount": pkg.get("MediumVulnerabilityCount", 0),
+#             "LowVulnerabilityCount": pkg.get("LowVulnerabilityCount", 0)
+#         } for pkg in packages]
+        
+#         # Mengonversi hasil ke dalam DataFrame Pandas untuk memudahkan manipulasi
+#         df = pd.DataFrame(results)
+#         total_data = len(df)
+#         st.write(f"**Total Data: {total_data}**")
+
+
+#         # Dropdown untuk memilih jumlah item per halaman
+#         items_per_page = st.selectbox('Items per page', [5, 10, 20, 50, 100], index=1)
+
+#         # Hitung total data dan halaman
+#         total_data = len(df)
+#         total_pages = math.ceil(total_data / items_per_page)
+
+#         # Pagination controls
+#         page = st.number_input('Page', min_value=1, max_value=total_pages, step=1)
+
+#         # Indexing untuk pagination
+#         start_idx = (page - 1) * items_per_page
+#         end_idx = min(start_idx + items_per_page, total_data)
+
+#         # Display tabel dengan pagination
+#         st.dataframe(df.iloc[start_idx:end_idx])
+
+#         # Info jumlah data yang ditampilkan dan total data
+#         st.write(f"Menampilkan data {start_idx + 1} hingga {end_idx} dari total {total_data} data.")
+#     else:
+#         st.write("Tidak ada data Packages yang ditemukan dalam laporan.")
+
 def sca_page_checkmarx_result():
     if st.button("Back"):
         st.session_state.page = "sca_checkmarx_dashboard"
     st.title("Result Checkmarx SCA")
 
+    # Pastikan access_token dan scan_id ada di session_state
     access_token = st.session_state.get('access_token', '')
     scan_id = st.session_state.get('scan_id', '')
 
     st.write(f"Scan ID: {scan_id}")
 
-    # URL untuk membuat laporan
-    create_report_url = "https://sng.ast.checkmarx.net/api/sca/export/requests"
+    # Jika data belum ada di session_state, ambil data baru
+    if 'report_data' not in st.session_state:
+        # URL untuk membuat laporan
+        create_report_url = "https://sng.ast.checkmarx.net/api/sca/export/requests"
 
-    # Headers
-    headers = {
-        "Authorization": f"Bearer {access_token}",  # Ganti dengan token akses Anda
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-
-    # Body parameters
-    data = {
-        "ScanId": scan_id,  # Menggunakan Scan ID dari session state
-        "FileFormat": "ScanReportJson",  # Format laporan yang diinginkan
-        "ExportParameters": {
-            "hideDevAndTestDependencies": False,
-            "showOnlyEffectiveLicenses": False,
-            "excludePackages": False,
-            "excludeLicenses": True,
-            "excludeVulnerabilities": False,
-            "excludePolicies": True
+        # Headers
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
         }
-    }
 
-    # Mengirimkan request POST untuk membuat laporan
-    response = requests.post(create_report_url, headers=headers, json=data)
+        # Body parameters
+        data = {
+            "ScanId": scan_id,
+            "FileFormat": "ScanReportJson",
+            "ExportParameters": {
+                "hideDevAndTestDependencies": False,
+                "showOnlyEffectiveLicenses": False,
+                "excludePackages": False,
+                "excludeLicenses": True,
+                "excludeVulnerabilities": False,
+                "excludePolicies": True
+            }
+        }
 
-    # Memeriksa status response untuk mendapatkan export_id
-    if response.status_code == 202:
-        export_id = response.json().get("exportId")
-        st.write(f"Laporan berhasil dibuat. Export ID: {export_id}")
-        
-        # Memeriksa status export sampai "Completed"
-        check_status_url = f"https://sng.ast.checkmarx.net/api/sca/export/requests?exportId={export_id}"
+        # Mengirimkan request POST untuk membuat laporan
+        response = requests.post(create_report_url, headers=headers, json=data)
 
-        # Menggunakan spinner sebagai animasi loading
-        with st.spinner('Menunggu hingga laporan selesai...'):
-            while True:
-                status_response = requests.get(check_status_url, headers=headers)
-                status_data = status_response.json()
-                export_status = status_data.get('exportStatus')
-                
-                if export_status == "Completed":
-                    st.success("Export Completed!")
-                    file_url = status_data.get('fileUrl')
-                    break
-                elif export_status == "Failed":
-                    st.error("Export gagal.")
-                    return
-                else:
-                    time.sleep(5)  # Tunggu 5 detik sebelum pengecekan ulang
+        if response.status_code == 202:
+            export_id = response.json().get("exportId")
+            st.write(f"Laporan berhasil dibuat. Export ID: {export_id}")
 
-        # Mengunduh hasil laporan setelah status Completed
-        download_url = file_url
-        download_response = requests.get(download_url, headers=headers)
+            check_status_url = f"https://sng.ast.checkmarx.net/api/sca/export/requests?exportId={export_id}"
 
-        if download_response.status_code == 200:
-            report_data = download_response.json()  # Parsing JSON dari response
+            with st.spinner('Menunggu hingga laporan selesai...'):
+                while True:
+                    status_response = requests.get(check_status_url, headers=headers)
+                    status_data = status_response.json()
+                    export_status = status_data.get('exportStatus')
 
-            # Membuat tabel untuk menampilkan hasil
-            if "Packages" in report_data:
-                packages = report_data["Packages"]
-                results = [{
-                    "Id": pkg["Id"],
-                    "Name": pkg["Name"],
-                    "Version": pkg["Version"],
-                    "Licenses": ', '.join(pkg.get("Licenses", [])),
-                    "MatchType": pkg.get("MatchType", ""),
-                    "CriticalVulnerabilityCount": pkg.get("CriticalVulnerabilityCount", 0),
-                    "HighVulnerabilityCount": pkg.get("HighVulnerabilityCount", 0),
-                    "MediumVulnerabilityCount": pkg.get("MediumVulnerabilityCount", 0),
-                    "LowVulnerabilityCount": pkg.get("LowVulnerabilityCount", 0)
-                } for pkg in packages]
+                    if export_status == "Completed":
+                        st.success("Export Completed!")
+                        file_url = status_data.get('fileUrl')
+                        break
+                    elif export_status == "Failed":
+                        st.error("Export gagal.")
+                        return
+                    else:
+                        time.sleep(5)
 
-                # Menampilkan data dalam tabel menggunakan Streamlit
-                st.table(results)
+            # Mengunduh hasil laporan setelah status Completed
+            download_url = file_url
+            download_response = requests.get(download_url, headers=headers)
+
+            if download_response.status_code == 200:
+                report_data = download_response.json()
+                st.session_state.report_data = report_data  # Simpan data ke session_state untuk paginasi
             else:
-                st.write("Tidak ada data Packages yang ditemukan dalam laporan.")
+                st.write(f"Terjadi kesalahan saat mengunduh laporan: {download_response.status_code} - {download_response.text}")
+                return
         else:
-            st.write(f"Terjadi kesalahan saat mengunduh laporan: {download_response.status_code} - {download_response.text}")
+            st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
+            st.write("Response:", response.text)
+            return
 
+    # Menggunakan data dari session_state jika sudah ada
+    report_data = st.session_state.report_data
+
+    if "Packages" in report_data:
+        packages = report_data["Packages"]
+        results = [{
+            "Id": pkg["Id"],
+            "Name": pkg["Name"],
+            "Version": pkg["Version"],
+            "Licenses": ', '.join(pkg.get("Licenses", [])),
+            "MatchType": pkg.get("MatchType", ""),
+            "CriticalVulnerabilityCount": pkg.get("CriticalVulnerabilityCount", 0),
+            "HighVulnerabilityCount": pkg.get("HighVulnerabilityCount", 0),
+            "MediumVulnerabilityCount": pkg.get("MediumVulnerabilityCount", 0),
+            "LowVulnerabilityCount": pkg.get("LowVulnerabilityCount", 0)
+        } for pkg in packages]
+
+        # Konversi hasil ke dalam DataFrame Pandas
+        df = pd.DataFrame(results)
+        total_data = len(df)
+        st.write(f"**Total Vulnerabilty: {total_data}**")
+        # Dropdown untuk memilih jumlah item per halaman
+        items_per_page = st.selectbox('Items per page', [5, 10, 20, 50, 100], index=1)
+
+        # Hitung total data dan halaman
+        total_data = len(df)
+        total_pages = math.ceil(total_data / items_per_page)
+
+        # Pagination controls
+        page = st.number_input('Page', min_value=1, max_value=total_pages, step=1)
+
+        # Indexing untuk pagination
+        start_idx = (page - 1) * items_per_page
+        end_idx = min(start_idx + items_per_page, total_data)
+
+        # Display tabel dengan pagination
+        st.dataframe(df.iloc[start_idx:end_idx])
+
+        # Info jumlah data yang ditampilkan dan total data
+        st.write(f"Menampilkan data {start_idx + 1} hingga {end_idx} dari total {total_data} data.")
     else:
-        st.write(f"Gagal membuat laporan. Status code: {response.status_code}")
-        st.write("Response:", response.text)
-
+        st.write("Tidak ada data Packages yang ditemukan dalam laporan.")
 
 def sast_page_checkmarx_result_group():
     if st.button("Back"):
